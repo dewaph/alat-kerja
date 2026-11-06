@@ -65,6 +65,14 @@ button{font:inherit;cursor:pointer}
 .kv{display:grid;grid-template-columns:max-content 1fr;gap:3px 14px;margin:10px 0;font-size:.92rem}
 .kv dt{color:var(--mute)}.kv dd{margin:0;overflow-wrap:anywhere}
 .unit .acts{justify-content:flex-start}
+.unit.s-tersedia{background:var(--bg);border-color:var(--line);border-left-color:var(--line)}
+.uc{text-transform:uppercase}
+.spkl{margin-top:6px;border:1px solid var(--line);border-radius:8px;background:var(--card);max-height:240px;overflow:auto}
+.spkit{display:block;width:100%;text-align:left;background:none;border:0;border-top:1px solid var(--line);padding:9px 10px;color:var(--ink)}
+.spkit:first-child{border-top:0}
+.spkit:hover,.spkit:focus-visible{background:var(--bg)}
+.spkit b{font-family:ui-monospace,Menlo,Consolas,monospace}
+.spkit span{display:block;font-size:.85rem;color:var(--mute);overflow-wrap:anywhere}
 .chips{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0 2px}
 .chip{border:1px solid var(--line);background:none;color:var(--ink);border-radius:99px;padding:6px 12px}
 .chip[aria-pressed="true"]{background:var(--acc);color:var(--acc-ink);border-color:var(--acc);font-weight:700}
@@ -106,8 +114,8 @@ function up(t,rows){return sb(t,{m:"POST",b:rows,prefer:"resolution=merge-duplic
 function dbDel(t,col,v){return sb(t+"?"+col+"=eq."+encodeURIComponent(v),{m:"DELETE",prefer:"return=minimal"})}
 function W(p){return p.catch(function(e){alert("Gagal menyimpan ke Supabase: "+(e&&e.message||e)+"\nData dimuat ulang dari database.");return load().then(function(){render()},function(){})})}
 function uRow(u){return{id:u.id,nama:u.nama,merek:u.merek||"",seri:u.seri,rusak:!!u.rusak,rusak_tgl:u.rusakTgl||null,rusak_ket:u.rusakKet||""}}
-function lRow(l){return{id:l.id,unit:l.unit,nama:l.nama,mandor:l.mandor||"",spk:l.spk||"",lok:l.lok||"",tgl:l.tgl,rencana:l.rencana||null,back:l.back||null}}
-function sRow(x){return{id:x.id,unit:x.unit,rusak:x.rusak||null,ket:x.ket||"",selesai:x.selesai,biaya:x.biaya||0,catatan:x.catatan||"",pj:x.pj||""}}
+function lRow(l){return{id:l.id,unit:l.unit,nama:norm(l.nama),mandor:norm(l.mandor),spk:String(l.spk||"").trim(),lok:norm(l.lok),tgl:l.tgl,rencana:l.rencana||null,back:l.back||null}}
+function sRow(x){return{id:x.id,unit:x.unit,rusak:x.rusak||null,ket:x.ket||"",selesai:x.selesai,biaya:x.biaya||0,catatan:x.catatan||"",pj:norm(x.pj)}}
 function load(){var o="?select=*&order=dibuat.asc,id.asc";
   return Promise.all([sb("ak_unit"+o),sb("ak_loan"+o),sb("ak_service"+o),sb("ak_wa?select=*"),sb("ak_hp?select=*")]).then(function(r){
     S.units=r[0].map(function(x){return{id:x.id,nama:x.nama,merek:x.merek,seri:x.seri,rusak:x.rusak,rusakTgl:x.rusak_tgl||"",rusakKet:x.rusak_ket||""}});
@@ -117,6 +125,26 @@ function load(){var o="?select=*&order=dibuat.asc,id.asc";
     S.hp={};r[4].forEach(function(x){S.hp[x.nama]=x.hp});
     ready=true})}
 function delUnit(id){S.units=S.units.filter(function(x){return x.id!==id});S.loans=S.loans.filter(function(l){return l.unit!==id});S.services=S.services.filter(function(x){return x.unit!==id});W(dbDel("ak_unit","id",id))}
+/* ===== pilih No. SPK dari tabel spk ===== */
+var spkRes=[],spkSeq=0,spkTm=null;
+function spkSearch(q){var seq=++spkSeq,box=document.getElementById("psr");if(!box)return;
+  var c=String(q||"").replace(/[%_*,()\\"']/g," ").replace(/\s+/g," ").trim(),f="";
+  if(c){var e=encodeURIComponent(c);f="&or=(no_spk.ilike.*"+e+"*,lokasi.ilike.*"+e+"*,pengawas.ilike.*"+e+"*,jenis_pekerjaan.ilike.*"+e+"*)"}
+  sb("spk?select=no_spk,pengawas,lokasi,jenis_pekerjaan,tanggal&order=tanggal.desc,id.desc&limit=15"+f).then(function(r){
+    if(seq!==spkSeq)return;box=document.getElementById("psr");if(!box)return;spkRes=r||[];
+    box.hidden=false;
+    box.innerHTML=spkRes.length?spkRes.map(function(x,i){return'<button type="button" class="spkit" data-i="'+i+'"><b>'+esc(x.no_spk)+'</b> \u00b7 '+esc(x.pengawas||"-")+' \u00b7 '+esc(x.lokasi||"-")+'<span>'+esc(x.jenis_pekerjaan||"")+(x.tanggal?' ('+fmt(x.tanggal)+')':'')+'</span></button>'}).join(""):'<p class="empty" style="padding:8px 10px;margin:0">SPK tidak ditemukan.</p>'
+  },function(er){if(seq!==spkSeq)return;box=document.getElementById("psr");if(box){box.hidden=false;box.innerHTML='<p class="bad" style="padding:8px 10px;margin:0">Gagal memuat SPK: '+esc(er&&er.message||er)+'</p>'}})}
+document.addEventListener("input",function(e){if(e.target.id!=="ps")return;e.target.dataset.ok="";clearTimeout(spkTm);var v=e.target.value;spkTm=setTimeout(function(){spkSearch(v)},250)});
+document.addEventListener("focusin",function(e){if(e.target.id==="ps"&&!e.target.dataset.ok)spkSearch(e.target.value)});
+document.addEventListener("click",function(e){var b=e.target.closest(".spkit");
+  if(!b){if(e.target.id!=="ps"){var bx=document.getElementById("psr");if(bx)bx.hidden=true}return}
+  var r=spkRes[+b.dataset.i];if(!r)return;
+  var ps=document.getElementById("ps"),pl=document.getElementById("pl"),pn=document.getElementById("pn");
+  ps.value=r.no_spk;ps.dataset.ok=r.no_spk;
+  if(r.lokasi)pl.value=norm(r.lokasi);
+  if(!pn.value.trim()&&r.pengawas)pn.value=norm(r.pengawas);
+  document.getElementById("psr").hidden=true;var pe=document.getElementById("pe");if(pe)pe.textContent=""});
 /* ===== status & impor data lama ===== */
 var syn={t:"load",m:""};
 function setSyn(t,m){syn={t:t,m:m||""};renderSync()}
@@ -136,7 +164,7 @@ function doImport(){setSyn("busy");
   var lr=(OLD.loans||[]).filter(function(l){return ids[l.unit]}).map(function(l){var r=lRow(l);r.dibuat=tm();return r});
   var sr=(OLD.services||[]).filter(function(x){return ids[x.unit]}).map(function(x){var r=sRow(x);r.dibuat=tm();return r});
   var wr=Object.keys(OLD.waSent||{}).map(function(k){return{k:k,data:OLD.waSent[k]}});
-  var hr=Object.keys(OLD.hp||{}).map(function(k){return{nama:k,hp:OLD.hp[k]||""}});
+  var hr=Object.keys(OLD.hp||{}).map(function(k){return{nama:norm(k),hp:OLD.hp[k]||""}});
   var bulk=function(t,rows){return rows.length?up(t,rows):Promise.resolve()};
   bulk("ak_unit",ur).then(function(){return Promise.all([bulk("ak_loan",lr),bulk("ak_service",sr)])}).then(function(){return Promise.all([bulk("ak_wa",wr),bulk("ak_hp",hr)])}).then(load).then(function(){
     try{localStorage.setItem("alatkerja.imported","1")}catch(e){}
@@ -150,6 +178,11 @@ document.getElementById("sync").addEventListener("click",function(e){var b=e.tar
 function refresh(){if(!ready||lendId||retId||svcId||confirmId||waOpen||page==="tambah")return;var a=document.activeElement;if(a&&/^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName))return;load().then(function(){render()},function(){})}
 document.addEventListener("visibilitychange",function(){if(!document.hidden)refresh()});
 setInterval(refresh,30000);
+function norm(s){return String(s==null?"":s).replace(/\s+/g," ").trim().toUpperCase()}
+function normSpk(s){return norm(s).replace(/\s*([\/-])\s*/g,"$1")}
+function uniqV(f,fn){var r=[];S.loans.forEach(function(l){var v=(fn||norm)(l[f]);if(v&&r.indexOf(v)<0)r.push(v)});return r.sort()}
+function dl(id,a){return'<datalist id="'+id+'">'+a.map(function(v){return'<option value="'+esc(v)+'"></option>'}).join("")+'</datalist>'}
+function dls(){return dl("dl-pn",uniqV("nama"))+dl("dl-pm",uniqV("mandor"))+dl("dl-pl",uniqV("lok"))}
 function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,6)}
 function esc(s){return String(s==null?"":s).replace(/[&<>"']/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]})}
 function ymd(d){return d.getFullYear()+"-"+("0"+(d.getMonth()+1)).slice(-2)+"-"+("0"+d.getDate()).slice(-2)}
@@ -189,7 +222,7 @@ function listAlat(){
     var ll=u.rusak?lastLoan(u.id):null;if(ll)rows.push(["Peminjam terakhir",ll.nama]);
     var sv=lastSvc(u.id);if(sv)rows.push(["Biaya servis terakhir",rp(sv.biaya)+" ("+fmt(sv.selesai)+")"]);
     var kv=rows.map(function(r){return'<dt>'+r[0]+'</dt><dd>'+esc(r[1])+'</dd>'}).join("");
-    h+='<div class="unit s-'+s+'"><div class="uh"><div><div class="t">'+esc(label(u))+'</div><div class="sn">No. seri: <span class="seri">'+esc(u.seri)+'</span></div></div><span class="badge '+cls+'">'+txt+'</span></div><dl class="kv">'+kv+'</dl><div class="acts">'+(s==="tersedia"?'<button class="btn" data-a="lend" data-id="'+u.id+'">Pinjam</button>':'')+'<button class="sm danger" data-a="ask" data-id="'+u.id+'">Hapus</button>'+'</div></div>'+(lendId===u.id?'<div class="ov"><form class="mdl" data-lend="'+u.id+'"><h2 style="flex:1 1 100%;margin:0">Pinjam '+esc(label(u))+'</h2><div class="sn" style="flex:1 1 100%">No. seri <span class="seri">'+esc(u.seri)+'</span></div><div style="flex:1 1 100%"><label for="pn">Nama peminjam</label><input id="pn" required></div><div style="flex:1 1 140px"><label for="pm">Nama mandor (opsional)</label><input id="pm"></div><div style="flex:1 1 140px"><label for="ps">No. SPK</label><input id="ps" required></div><div style="flex:1 1 100%"><label for="pl">Lokasi pekerjaan</label><input id="pl" required></div><div style="flex:1 1 140px"><label for="pt">Tanggal pinjam</label><input id="pt" type="date" value="'+today()+'" required></div><div style="flex:1 1 140px"><label for="pk">Tanggal kembali</label><input id="pk" type="date" required></div><p id="pe" class="bad" style="flex:1 1 100%;margin:0"></p><div class="acts"><button class="btn" type="submit">Catat pinjam</button><button class="sm" type="button" data-a="cancel">Batal</button></div></form></div>':'')+(confirmId===u.id?'<div class="ov"><form class="mdl" data-del="'+u.id+'"><h2 style="flex:1 1 100%;margin:0">Hapus alat</h2><div class="sn" style="flex:1 1 100%">'+esc(label(u))+' · <span class="seri">'+esc(u.seri)+'</span></div><div class="m" style="flex:1 1 100%">Alat beserta riwayat pinjam dan servisnya akan dihapus.</div><div style="flex:1 1 100%"><label for="dp">Password</label><input id="dp" type="password" autocomplete="off" required></div><p id="de" class="bad" style="flex:1 1 100%;margin:0"></p><div class="acts"><button class="btn" type="submit">Hapus alat</button><button class="sm" type="button" data-a="cancel">Batal</button></div></form></div>':'')});
+    h+='<div class="unit s-'+s+'"><div class="uh"><div><div class="t">'+esc(label(u))+'</div><div class="sn">No. seri: <span class="seri">'+esc(u.seri)+'</span></div></div><span class="badge '+cls+'">'+txt+'</span></div><dl class="kv">'+kv+'</dl><div class="acts">'+(s==="tersedia"?'<button class="btn" data-a="lend" data-id="'+u.id+'">Pinjam</button>':'')+'<button class="sm danger" data-a="ask" data-id="'+u.id+'">Hapus</button>'+'</div></div>'+(lendId===u.id?'<div class="ov"><form class="mdl" data-lend="'+u.id+'"><h2 style="flex:1 1 100%;margin:0">Pinjam '+esc(label(u))+'</h2><div class="sn" style="flex:1 1 100%">No. seri <span class="seri">'+esc(u.seri)+'</span></div><div style="flex:1 1 100%"><label for="pn">Nama peminjam</label><input id="pn" class="uc" list="dl-pn" autocomplete="off" required></div><div style="flex:1 1 140px"><label for="pm">Nama mandor (opsional)</label><input id="pm" class="uc" list="dl-pm" autocomplete="off"></div><div style="flex:1 1 100%"><label for="ps">No. SPK (cari lalu pilih dari daftar)</label><input id="ps" class="uc" autocomplete="off" placeholder="Ketik no. SPK, lokasi, atau pekerjaan" required><div id="psr" class="spkl" hidden></div></div><div style="flex:1 1 100%"><label for="pl">Lokasi pekerjaan</label><input id="pl" class="uc" list="dl-pl" autocomplete="off" required></div><div style="flex:1 1 140px"><label for="pt">Tanggal pinjam</label><input id="pt" type="date" value="'+today()+'" required></div><div style="flex:1 1 140px"><label for="pk">Tanggal kembali</label><input id="pk" type="date" required></div><p id="pe" class="bad" style="flex:1 1 100%;margin:0"></p><div class="acts"><button class="btn" type="submit">Catat pinjam</button><button class="sm" type="button" data-a="cancel">Batal</button></div>'+dls()+'</form></div>':'')+(confirmId===u.id?'<div class="ov"><form class="mdl" data-del="'+u.id+'"><h2 style="flex:1 1 100%;margin:0">Hapus alat</h2><div class="sn" style="flex:1 1 100%">'+esc(label(u))+' · <span class="seri">'+esc(u.seri)+'</span></div><div class="m" style="flex:1 1 100%">Alat beserta riwayat pinjam dan servisnya akan dihapus.</div><div style="flex:1 1 100%"><label for="dp">Password</label><input id="dp" type="password" autocomplete="off" required></div><p id="de" class="bad" style="flex:1 1 100%;margin:0"></p><div class="acts"><button class="btn" type="submit">Hapus alat</button><button class="sm" type="button" data-a="cancel">Batal</button></div></form></div>':'')});
   document.getElementById("lst").innerHTML=h;
 }
 
@@ -376,13 +409,17 @@ document.querySelector("main").addEventListener("submit",function(e){
     var ns={id:uid(),unit:sid,rusak:su.rusakTgl||"",ket:su.rusakKet||"",selesai:sg,biaya:sbi,catatan:sct,pj:(lastLoan(sid)||{}).nama||""};S.services.push(ns);
     su.rusak=false;su.rusakTgl="";su.rusakKet="";W(up("ak_service",sRow(ns)).then(function(){return up("ak_unit",uRow(su))}));svcId=null;save();render()}
   else if(id){e.preventDefault();
-    var nm=document.getElementById("pn").value.trim(),tg=document.getElementById("pt").value,tk=document.getElementById("pk").value;
-    var sp=document.getElementById("ps").value.trim(),lk=document.getElementById("pl").value.trim();
+    var nm=norm(document.getElementById("pn").value),tg=document.getElementById("pt").value,tk=document.getElementById("pk").value;
+    var psI=document.getElementById("ps"),sp=psI.value.trim(),lk=norm(document.getElementById("pl").value),md=norm(document.getElementById("pm").value),pe=document.getElementById("pe");
     if(!nm||loanOf(id))return;
-    if(!sp||!lk||!tk){document.getElementById("pe").textContent="Semua isian wajib diisi kecuali mandor.";return}
-    if(tk&&tk<tg){document.getElementById("pe").textContent="Tanggal kembali tidak boleh sebelum tanggal pinjam.";return}
-    var nl={id:uid(),unit:id,nama:nm,mandor:document.getElementById("pm").value.trim(),spk:document.getElementById("ps").value.trim(),lok:document.getElementById("pl").value.trim(),tgl:tg,rencana:tk,back:null};S.loans.push(nl);W(up("ak_loan",lRow(nl)));
-    lendId=null;save();render()}
+    if(!sp||!lk||!tk){pe.textContent="Semua isian wajib diisi kecuali mandor.";return}
+    if(tk&&tk<tg){pe.textContent="Tanggal kembali tidak boleh sebelum tanggal pinjam.";return}
+    var fin=function(spk){var nl={id:uid(),unit:id,nama:nm,mandor:md,spk:spk,lok:lk,tgl:tg,rencana:tk,back:null};S.loans.push(nl);W(up("ak_loan",lRow(nl)));lendId=null;save();render()};
+    if(psI.dataset.ok&&psI.dataset.ok.toLowerCase()===sp.toLowerCase()){fin(psI.dataset.ok);return}
+    pe.textContent="Memeriksa No. SPK\u2026";
+    sb("spk?select=no_spk&no_spk=ilike."+encodeURIComponent(sp.replace(/[%_*,()\\]/g,""))+"&limit=1").then(function(r){
+      if(r&&r.length){fin(r[0].no_spk)}else{var e2=document.getElementById("pe");if(e2)e2.textContent="No. SPK \""+sp+"\" tidak ada di tabel SPK. Pilih dari daftar."}
+    },function(er){var e2=document.getElementById("pe");if(e2)e2.textContent="Gagal memeriksa SPK: "+(er&&er.message||er)})}
   else if(rid){e.preventDefault();
     var tb=document.getElementById("rb").value;
     S.loans.forEach(function(l){if(l.id!==rid)return;if(tb<l.tgl){document.getElementById("re").textContent="Tanggal kembali tidak boleh sebelum tanggal pinjam ("+fmt(l.tgl)+").";return}var kd=document.getElementById("rk").value==="rusak",kt=document.getElementById("rket").value.trim();if(kd&&!kt){document.getElementById("re").textContent="Isi keterangan rusak karena apa.";return}l.back=tb;W(up("ak_loan",lRow(l)));if(kd){var ru=S.units.filter(function(x){return x.id===l.unit})[0];if(ru){ru.rusak=true;ru.rusakTgl=tb;ru.rusakKet=kt;W(up("ak_unit",uRow(ru)))}}retId=null;save();render()})}
