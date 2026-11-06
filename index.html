@@ -371,7 +371,26 @@ WP.addEventListener("click",function(e){var t=e.target;
 });
 document.getElementById("wm").onclick=function(){waOpen=!waOpen;renderWa()};
 document.addEventListener("keydown",function(e){if(e.key==="Escape"&&waOpen){waOpen=false;renderWa()}});
-var _render=render;render=function(){_render();renderWa()};
+var _render=render;render=function(){_render();renderWa();navSync()};
+var _rw=renderWa;renderWa=function(){_rw();navSync()};
+/* ===== tombol Back HP: kembali ke tampilan sebelumnya (tab, halaman riwayat/form, jendela popup) ===== */
+var navOK=true,navStack=[],navSkip=0;
+function navCur(){return{t:tab,p:page||null,o:(lendId||retId||svcId||ketId||confirmId||waOpen)?1:0}}
+function navSame(a,b){return !!a&&!!b&&a.t===b.t&&a.p===b.p&&a.o===b.o}
+function navInit(){try{navStack=[navCur()];history.replaceState({n:0,c:navStack[0]},"")}catch(e){navOK=false}}
+function navSync(){if(!navOK)return;
+  var cur=navCur(),last=navStack[navStack.length-1];if(navSame(cur,last))return;
+  try{
+    if(navStack.length>1&&navSame(cur,navStack[navStack.length-2])){navStack.pop();navSkip++;history.back();return}
+    navStack.push(cur);history.pushState({n:navStack.length-1,c:cur},"")
+  }catch(e){navOK=false}}
+window.addEventListener("popstate",function(e){
+  if(navSkip>0){navSkip--;return}
+  var st=e.state;if(!st||st.n==null||!st.c)return;
+  navStack=navStack.slice(0,st.n);navStack[st.n]=st.c;
+  tab=st.c.t;page=st.c.p;lendId=retId=svcId=ketId=confirmId=null;waOpen=false;
+  render();window.scrollTo(0,0)});
+
 renderWa();
 function histCard(cls,u,badge,bcls,rows){var kv=rows.map(function(r){return'<dt>'+r[0]+'</dt><dd>'+esc(r[1])+'</dd>'}).join("");return'<div class="unit '+cls+'"><div class="uh"><div><div class="t">'+esc(u?label(u):"(alat dihapus)")+'</div><div style="margin-top:4px">No. seri: <span class="seri">'+esc(u?u.seri:"-")+'</span></div></div><span class="badge '+bcls+'">'+badge+'</span></div><dl class="kv">'+kv+'</dl></div>'}
 function info(l){var a=[];if(l.mandor)a.push("Mandor "+esc(l.mandor));if(l.spk)a.push("SPK "+esc(l.spk));if(l.lok)a.push(esc(l.lok));return a.join(" \u00b7 ")}
@@ -481,6 +500,7 @@ themeLabel();
 document.querySelector("main").addEventListener("change",function(e){var i=e.target.id;if(i==="pf"){pf=e.target.value;pg.pinjam=1;render()}else if(i==="rk"){var rw=document.getElementById("rkw"),ri=document.getElementById("rket"),rr=e.target.value==="rusak";rw.hidden=!rr;ri.required=rr;if(rr)ri.focus()}else if(i==="fp"||i==="fa"){F[i==="fp"?"p":"a"]=e.target.value;pg.rp=pg.rs=1;render()}});
 document.addEventListener("keydown",function(e){if(e.key==="Escape"&&(lendId||svcId||ketId||retId||confirmId)){lendId=null;svcId=null;ketId=null;retId=null;confirmId=null;render()}});
 document.getElementById("wmi").outerHTML=WAIC;
+navInit();
 renderSync();ntAuto();
 load().then(function(){checkOld();render()},function(e){setSyn("err",e&&e.message||"")});
 </script>
