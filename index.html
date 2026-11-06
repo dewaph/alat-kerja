@@ -67,6 +67,9 @@ button{font:inherit;cursor:pointer}
 .unit .acts{justify-content:flex-start}
 .unit.s-tersedia{background:var(--bg);border-color:var(--line);border-left-color:var(--line)}
 .uc{text-transform:uppercase}
+.pager{display:flex;gap:8px;align-items:center;justify-content:space-between;margin-top:12px}
+.pager .m{flex:1;text-align:center}
+.pager button:disabled{opacity:.4;cursor:default}
 .unit[data-go]{cursor:pointer}
 @keyframes hl{0%,65%{box-shadow:0 0 0 4px var(--acc)}100%{box-shadow:0 0 0 0 transparent}}
 .hl{animation:hl 2.6s ease-out}
@@ -148,6 +151,29 @@ document.addEventListener("click",function(e){var b=e.target.closest(".spkit");
   if(r.lokasi)pl.value=norm(r.lokasi);
   if(!pn.value.trim()&&r.pengawas)pn.value=norm(r.pengawas);
   document.getElementById("psr").hidden=true;var pe=document.getElementById("pe");if(pe)pe.textContent=""});
+/* ===== notifikasi HP (Web Push), otomatis ===== */
+var FN=SB_URL+"/functions/v1/alat-push",ntTries=0;
+function fn(b){return fetch(FN,{method:"POST",headers:{"Content-Type":"application/json",apikey:SB_KEY},body:JSON.stringify(b)}).then(function(r){return r.json().then(function(j){if(!r.ok||(j&&j.error))throw new Error((j&&j.error)||("HTTP "+r.status));return j})})}
+function b64u(s){var p="=".repeat((4-s.length%4)%4),b=(s+p).replace(/-/g,"+").replace(/_/g,"/"),r=atob(b),o=new Uint8Array(r.length);for(var i=0;i<r.length;i++)o[i]=r.charCodeAt(i);return o}
+function pushOK(){return window.isSecureContext&&("serviceWorker" in navigator)&&("PushManager" in window)&&("Notification" in window)}
+function ntSub(){return navigator.serviceWorker.register("sw.js").then(function(){return navigator.serviceWorker.ready}).then(function(reg){
+  return fn({action:"key"}).then(function(k){return reg.pushManager.getSubscription().then(function(s){return s||reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:b64u(k.key)})})})
+}).then(function(sub){return fn({action:"subscribe",sub:sub.toJSON(),url:location.href.split("#")[0]}).then(function(){return sub})})}
+/* Dipanggil otomatis saat halaman dibuka dan saat pengguna pertama kali menyentuh layar
+   (iPhone/Safari hanya mau menampilkan izin setelah disentuh). */
+function ntAuto(){
+  if(!pushOK())return;
+  var perm=Notification.permission;
+  if(perm==="denied")return;
+  if(perm==="granted"){ntSub().catch(function(){});return}
+  if(ntTries>=2)return;ntTries++;
+  Promise.resolve(Notification.requestPermission()).then(function(p){
+    if(p!=="granted")return;
+    return ntSub().then(function(sub){return fn({action:"tes",endpoint:sub.endpoint}).catch(function(){})})
+  }).catch(function(){})}
+["pointerdown","keydown"].forEach(function(ev){document.addEventListener(ev,function h(){
+  if(!pushOK()||Notification.permission!=="default"||ntTries>=2){document.removeEventListener(ev,h);return}
+  ntAuto()},{passive:true})});
 /* ===== status & impor data lama ===== */
 var syn={t:"load",m:""};
 function setSyn(t,m){syn={t:t,m:m||""};renderSync()}
@@ -186,6 +212,9 @@ function normSpk(s){return norm(s).replace(/\s*([\/-])\s*/g,"$1")}
 function uniqV(f,fn){var r=[];S.loans.forEach(function(l){var v=(fn||norm)(l[f]);if(v&&r.indexOf(v)<0)r.push(v)});return r.sort()}
 function dl(id,a){return'<datalist id="'+id+'">'+a.map(function(v){return'<option value="'+esc(v)+'"></option>'}).join("")+'</datalist>'}
 function dls(){return dl("dl-pn",uniqV("nama"))+dl("dl-pm",uniqV("mandor"))+dl("dl-pl",uniqV("lok"))}
+var PS=20,pg={alat:1,pinjam:1,servis:1,rp:1,rs:1},fcL=null,fcS=null;
+function paged(a,k){var n=Math.max(1,Math.ceil(a.length/PS));pg[k]=Math.min(Math.max(1,pg[k]),n);return a.slice((pg[k]-1)*PS,pg[k]*PS)}
+function pagerHtml(k,total){if(total<=PS)return"";var n=Math.ceil(total/PS),c=pg[k];return'<div class="pager"><button class="sm" type="button" data-a="pg" data-k="'+k+'" data-d="-1"'+(c<=1?" disabled":"")+'>\u2039 Sebelumnya</button><span class="m">Halaman '+c+' dari '+n+'<br>'+total+' data</span><button class="sm" type="button" data-a="pg" data-k="'+k+'" data-d="1"'+(c>=n?" disabled":"")+'>Berikutnya \u203a</button></div>'}
 function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,6)}
 function esc(s){return String(s==null?"":s).replace(/[&<>"']/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]})}
 function ymd(d){return d.getFullYear()+"-"+("0"+(d.getMonth()+1)).slice(-2)+"-"+("0"+d.getDate()).slice(-2)}
@@ -212,7 +241,8 @@ function statusOf(u){return u.rusak?"rusak":loanOf(u.id)?"dipinjam":"tersedia"}
 function listAlat(){
   var list=S.units.filter(function(u){return match(u,q)&&(flt==="semua"||statusOf(u)===flt)}),h="";
   if(!list.length)h='<p class="empty">'+(S.units.length?"Tidak ada alat yang cocok dengan pencarian atau filter ini.":"Belum ada alat. Tekan Tambah unit untuk mencatat unit pertama.")+'</p>';
-  list.forEach(function(u){
+  var totA=list.length;
+  paged(list,"alat").forEach(function(u){
     var l=loanOf(u.id),s=statusOf(u),cls=s==="tersedia"?"ok":s==="dipinjam"?"warn":"bad",txt=s==="tersedia"?"Tersedia":s==="dipinjam"?"Dipinjam":"Rusak";
     var rows=[["Lokasi",l?(l.lok||"Belum diisi"):"Gudang"]];
     if(l){var sisa=l.rencana?days(today(),l.rencana):null;
@@ -226,7 +256,7 @@ function listAlat(){
     var sv=lastSvc(u.id);if(sv)rows.push(["Biaya servis terakhir",rp(sv.biaya)+" ("+fmt(sv.selesai)+")"]);
     var kv=rows.map(function(r){return'<dt>'+r[0]+'</dt><dd>'+esc(r[1])+'</dd>'}).join("");
     h+='<div class="unit s-'+s+'"'+(s==="tersedia"?'':' data-go="'+u.id+'" role="link" tabindex="0" aria-label="Buka di tab '+(s==="dipinjam"?"Pinjam":"Servis")+'"')+'><div class="uh"><div><div class="t">'+esc(label(u))+'</div><div class="sn">No. seri: <span class="seri">'+esc(u.seri)+'</span></div></div><span class="badge '+cls+'">'+txt+'</span></div><dl class="kv">'+kv+'</dl><div class="acts">'+(s==="tersedia"?'<button class="btn" data-a="lend" data-id="'+u.id+'">Pinjam</button>':'')+'<button class="sm danger" data-a="ask" data-id="'+u.id+'">Hapus</button>'+'</div></div>'+(lendId===u.id?'<div class="ov"><form class="mdl" data-lend="'+u.id+'"><h2 style="flex:1 1 100%;margin:0">Pinjam '+esc(label(u))+'</h2><div class="sn" style="flex:1 1 100%">No. seri <span class="seri">'+esc(u.seri)+'</span></div><div style="flex:1 1 100%"><label for="pn">Nama peminjam</label><input id="pn" class="uc" list="dl-pn" autocomplete="off" required></div><div style="flex:1 1 140px"><label for="pm">Nama mandor (opsional)</label><input id="pm" class="uc" list="dl-pm" autocomplete="off"></div><div style="flex:1 1 100%"><label for="ps">No. SPK (cari lalu pilih dari daftar)</label><input id="ps" class="uc" autocomplete="off" placeholder="Ketik no. SPK, lokasi, atau pekerjaan" required><div id="psr" class="spkl" hidden></div></div><div style="flex:1 1 100%"><label for="pl">Lokasi pekerjaan</label><input id="pl" class="uc" list="dl-pl" autocomplete="off" required></div><div style="flex:1 1 140px"><label for="pt">Tanggal pinjam</label><input id="pt" type="date" value="'+today()+'" required></div><div style="flex:1 1 140px"><label for="pk">Tanggal kembali</label><input id="pk" type="date" required></div><p id="pe" class="bad" style="flex:1 1 100%;margin:0"></p><div class="acts"><button class="btn" type="submit">Catat pinjam</button><button class="sm" type="button" data-a="cancel">Batal</button></div>'+dls()+'</form></div>':'')+(confirmId===u.id?'<div class="ov"><form class="mdl" data-del="'+u.id+'"><h2 style="flex:1 1 100%;margin:0">Hapus alat</h2><div class="sn" style="flex:1 1 100%">'+esc(label(u))+' · <span class="seri">'+esc(u.seri)+'</span></div><div class="m" style="flex:1 1 100%">Alat beserta riwayat pinjam dan servisnya akan dihapus.</div><div style="flex:1 1 100%"><label for="dp">Password</label><input id="dp" type="password" autocomplete="off" required></div><p id="de" class="bad" style="flex:1 1 100%;margin:0"></p><div class="acts"><button class="btn" type="submit">Hapus alat</button><button class="sm" type="button" data-a="cancel">Batal</button></div></form></div>':'')});
-  document.getElementById("lst").innerHTML=h;
+  document.getElementById("lst").innerHTML=h+pagerHtml("alat",totA);
 }
 
 function renderAlat(){
@@ -236,7 +266,7 @@ function renderAlat(){
   var h='<p style="margin:0 0 12px"><button class="btn" data-a="page" data-p="tambah">Tambah unit</button></p>';
   h+='<div class="card"><h2>Daftar alat</h2><input id="q" placeholder="Cari nama, nomor seri, lokasi, atau peminjam" value="'+esc(q)+'" aria-label="Cari alat">'+chips+'<div id="lst"></div></div>';
   document.getElementById("alat").innerHTML=h;listAlat();
-  document.getElementById("q").oninput=function(e){q=e.target.value;listAlat()};
+  document.getElementById("q").oninput=function(e){q=e.target.value;pg.alat=1;listAlat()};
 }
 function renderPage(){
   var el=document.getElementById("page");
@@ -257,7 +287,7 @@ function renderPage(){
     else{h+='<div class="card">';
       var tot=sv.reduce(function(a,x){return a+(x.biaya||0)},0);
       h+='<p class="sum">'+sv.length+' kali servis \u00b7 Total biaya <b>'+rp(tot)+'</b></p>';
-      sv.forEach(function(x){var u=unit(x.unit),rows=[];
+      paged(sv,"rs").forEach(function(x){var u=unit(x.unit),rows=[];
         if(x.rusak)rows.push(["Rusak sejak",fmt(x.rusak)]);
         if(x.ket)rows.push(["Kerusakan",x.ket]);
         rows.push(["Selesai servis",fmt(x.selesai)]);
@@ -266,7 +296,7 @@ function renderPage(){
         if(x.pj)rows.push(["Peminjam terakhir",x.pj]);
         if(x.catatan)rows.push(["Catatan",x.catatan]);
         h+=histCard("s-tersedia",u,"Selesai diservis","ok",rows)});
-      h+='</div>'}
+      h+=pagerHtml("rs",sv.length)+'</div>'}
     el.innerHTML=h;
   }else{
     var allL=S.loans.slice().reverse(),all=allL.filter(function(l){return hmatch(l.nama,unit(l.unit))});
@@ -275,13 +305,13 @@ function renderPage(){
     else{h+='<div class="card">';
       var aktif=all.filter(function(l){return!l.back}).length;
       h+='<p class="sum">'+all.length+' peminjaman \u00b7 '+aktif+' masih dipinjam \u00b7 '+(all.length-aktif)+' sudah kembali</p>';
-      all.forEach(function(l){var u=unit(l.unit),rows=[["Peminjam",l.nama]];
+      paged(all,"rp").forEach(function(l){var u=unit(l.unit),rows=[["Peminjam",l.nama]];
         if(l.mandor)rows.push(["Mandor",l.mandor]);
         if(l.spk)rows.push(["No. SPK",l.spk]);
         if(l.lok)rows.push(["Lokasi kerja",l.lok]);
         rows.push(["Tgl pinjam",fmt(l.tgl)],["Tgl kembali",l.back?fmt(l.back):"Belum dikembalikan"],["Lama pinjam",days(l.tgl,l.back||today())+" hari"+(l.back?"":" (masih berjalan)")]);
         h+=histCard(l.back?"s-tersedia":"s-dipinjam",u,l.back?"Sudah kembali":"Masih dipinjam",l.back?"ok":"warn",rows)});
-      h+='</div>'}
+      h+=pagerHtml("rp",all.length)+'</div>'}
     el.innerHTML=h;
   }
 }
@@ -350,7 +380,9 @@ function renderPinjam(){
   h+='<div class="card"><h2>Sedang dipinjam ('+act.length+')'+(late?' <span class="bad">\u00b7 '+late+' terlambat</span>':'')+'</h2>';
   if(all.length)h+='<div style="margin:0 0 8px"><label for="pf">Filter pengawas</label><select id="pf"><option value="semua">Semua pengawas</option>'+names.map(function(n){return'<option value="'+esc(n)+'"'+(n===pf?' selected':'')+'>'+esc(n)+'</option>'}).join("")+'</select></div>';
   if(!act.length)h+='<p class="empty">Belum ada alat yang dipinjam. Untuk meminjam, buka tab Alat lalu tekan Pinjam pada unitnya.</p>';
-  act.forEach(function(l){
+  var totP=act.length;
+  if(fcL){for(var fi=0;fi<act.length;fi++)if(act[fi].id===fcL){pg.pinjam=Math.floor(fi/PS)+1;break}fcL=null}
+  paged(act,"pinjam").forEach(function(l){
     var u=unit(l.unit),sisa=l.rencana?days(today(),l.rencana):null;
     var bc=sisa===null?"m":sisa<=3?"bad":"ok";
     var bt=sisa===null?"Tanpa tgl kembali":sisa<0?"Terlambat "+(-sisa)+" hari":sisa===0?"Jatuh tempo hari ini":sisa+" hari lagi";
@@ -361,20 +393,22 @@ function renderPinjam(){
     rows.push(["Tgl pinjam",fmt(l.tgl)+" ("+days(l.tgl,today())+" hari)"],["Tgl kembali",l.rencana?fmt(l.rencana):"Belum diisi"]);
     var kv=rows.map(function(r){return'<dt>'+r[0]+'</dt><dd>'+esc(r[1])+'</dd>'}).join("");
     h+='<div id="ln-'+l.id+'" class="unit '+(sisa!==null&&sisa<=3?"s-rusak":"s-aman")+'"><div class="uh"><div><div class="t">'+esc(u?label(u):"(alat dihapus)")+'</div><div class="sn">No. seri: <span class="seri">'+esc(u?u.seri:"-")+'</span></div></div><span class="badge '+bc+'">'+bt+'</span></div><dl class="kv">'+kv+'</dl><div class="acts"><button class="btn" data-a="back" data-id="'+l.id+'">Kembalikan</button>'+waBtn(l)+'</div></div>'+(retId===l.id?'<div class="ov"><form class="mdl" data-ret="'+l.id+'"><h2 style="flex:1 1 100%;margin:0">Kembalikan alat</h2><div class="sn" style="flex:1 1 100%">'+esc(u?label(u):"")+(u?' \u00b7 <span class="seri">'+esc(u.seri)+'</span>':'')+'</div><div style="flex:1 1 100%"><label for="rb">Tanggal kembali</label><input id="rb" type="date" value="'+today()+'" required></div><div style="flex:1 1 100%"><label for="rk">Kondisi barang</label><select id="rk"><option value="baik">Baik</option><option value="rusak">Rusak</option></select></div><div id="rkw" hidden style="flex:1 1 100%"><label for="rket">Keterangan rusak</label><input id="rket" placeholder="Contoh: mata bor patah"></div><p id="re" class="bad" style="flex:1 1 100%;margin:0"></p><div class="acts"><button class="btn" type="submit">Simpan</button><button class="sm" type="button" data-a="cancel">Batal</button></div></form></div>':'')});
-  document.getElementById("pinjam").innerHTML=h+'</div>';
+  document.getElementById("pinjam").innerHTML=h+pagerHtml("pinjam",totP)+'</div>';
 }
 
 function renderServis(){
   var list=S.units.filter(function(u){return u.rusak}).sort(function(a,b){return(a.rusakTgl||"9999")<(b.rusakTgl||"9999")?-1:1});
   var h='<p style="margin:0 0 12px"><button class="btn" data-a="page" data-p="servis">Riwayat servis</button></p><div class="card"><h2>Alat yang perlu diservis ('+list.length+')</h2>';
   if(!list.length)h+='<p class="empty">Tidak ada alat rusak. Unit yang ditandai rusak di tab Alat akan muncul di sini.</p>';
-  list.forEach(function(u){
+  var totS=list.length;
+  if(fcS){for(var fj=0;fj<list.length;fj++)if(list[fj].id===fcS){pg.servis=Math.floor(fj/PS)+1;break}fcS=null}
+  paged(list,"servis").forEach(function(u){
     var ll=lastLoan(u.id),sv=lastSvc(u.id),d=u.rusakTgl?days(u.rusakTgl,today()):null;
     var rows=[["Rusak sejak",u.rusakTgl?fmt(u.rusakTgl):"-"],["Keterangan rusak",u.rusakKet||"Belum diisi"]];
     if(ll)rows.push(["Peminjam terakhir",ll.nama]);
     var kv=rows.map(function(r){return'<dt>'+r[0]+'</dt><dd>'+esc(r[1])+'</dd>'}).join("");
     h+='<div id="sv-'+u.id+'" class="unit s-rusak"><div class="uh"><div><div class="t">'+esc(label(u))+'</div><div class="sn">No. seri: <span class="seri">'+esc(u.seri)+'</span></div></div><span class="badge bad">'+(d===null?"Rusak":d===0?"Rusak hari ini":"Rusak "+d+" hari")+'</span></div><dl class="kv">'+kv+'</dl><div class="acts"><button class="btn" data-a="svc" data-id="'+u.id+'">Selesai diservis</button>'+svcBtn(u)+'</div></div>'+(svcId===u.id?'<div class="ov"><form class="mdl" data-svc="'+u.id+'"><h2 style="flex:1 1 100%;margin:0">Selesai diservis</h2><div class="sn" style="flex:1 1 100%">'+esc(label(u))+' · <span class="seri">'+esc(u.seri)+'</span></div><div style="flex:1 1 140px"><label for="sd">Tanggal selesai servis</label><input id="sd" type="date" value="'+today()+'" required></div><div style="flex:1 1 140px"><label for="sb">Biaya servis (Rp)</label><input id="sb" type="number" min="0" inputmode="numeric" placeholder="0"></div><div style="flex:1 1 100%"><label for="sc">Catatan (opsional)</label><input id="sc" placeholder="Contoh: ganti karbon brush"></div><div class="acts"><button class="btn" type="submit">Simpan servis</button><button class="sm" type="button" data-a="cancel">Batal</button></div></form></div>':'')});
-  document.getElementById("servis").innerHTML=h+'</div>';
+  document.getElementById("servis").innerHTML=h+pagerHtml("servis",totS)+'</div>';
 }
 
 function render(){
@@ -388,7 +422,7 @@ function render(){
 
 document.querySelector("nav").onclick=function(e){var b=e.target.closest("button");if(b){tab=b.dataset.t;confirmId=null;lendId=null;retId=null;ketId=null;render()}};
 function goUnit(id){var u=unit(id),l=loanOf(id),tid;
-  if(l){tab="pinjam";pf="semua";tid="ln-"+l.id}else if(u&&u.rusak){tab="servis";tid="sv-"+id}else return;
+  if(l){tab="pinjam";pf="semua";tid="ln-"+l.id;fcL=l.id}else if(u&&u.rusak){tab="servis";tid="sv-"+id;fcS=id}else return;
   lendId=retId=svcId=ketId=confirmId=null;page=null;render();
   var el=document.getElementById(tid);if(el){el.scrollIntoView({block:"center"});el.classList.remove("hl");void el.offsetWidth;el.classList.add("hl");setTimeout(function(){el.classList.remove("hl")},2700)}else window.scrollTo(0,0)}
 document.addEventListener("keydown",function(e){if(e.key==="Enter"&&e.target.matches&&e.target.matches(".unit[data-go]")){e.preventDefault();goUnit(e.target.dataset.go)}});
@@ -396,14 +430,14 @@ document.querySelector("main").addEventListener("click",function(e){
   if(e.target.classList.contains("ov")){lendId=null;svcId=null;ketId=null;retId=null;confirmId=null;render();return}
   var g=e.target.closest(".unit[data-go]");if(g&&!e.target.closest("button,a,input,select,label")){goUnit(g.dataset.go);return}
   var b=e.target.closest("[data-a]");if(!b)return;var id=b.dataset.id,a=b.dataset.a,u=unit(id);
-  if(a==="page"){page=b.dataset.p||null;F.p=F.a="";lendId=null;retId=null;confirmId=null}else if(a==="flt"){flt=b.dataset.f}else if(a==="fr"){F.p=F.a=""}else if(a==="lend"){lendId=id;confirmId=null}else if(a==="cancel"){lendId=null;retId=null;svcId=null;ketId=null;confirmId=null}
+  if(a==="page"){page=b.dataset.p||null;F.p=F.a="";pg.rp=pg.rs=1;lendId=null;retId=null;confirmId=null}else if(a==="flt"){flt=b.dataset.f;pg.alat=1}else if(a==="pg"){pg[b.dataset.k]=(pg[b.dataset.k]||1)+(+b.dataset.d)}else if(a==="fr"){F.p=F.a="";pg.rp=pg.rs=1}else if(a==="lend"){lendId=id;confirmId=null}else if(a==="cancel"){lendId=null;retId=null;svcId=null;ketId=null;confirmId=null}
   else if(a==="ask"){confirmId=id}
   else if(a==="del"){delUnit(id);confirmId=null;save()}
   else if(a==="wa"){addSel(id)}
   else if(a==="back"){retId=id;lendId=null}
   else if(a==="svc"){svcId=id;lendId=null;retId=null}
   render();
-  if(a==="page")window.scrollTo(0,0);
+  if(a==="page"||a==="pg")window.scrollTo(0,0);
   if(lendId){var pi=document.getElementById("pn");if(pi)pi.focus()}
   if(confirmId){var di=document.getElementById("dp");if(di)di.focus()}
 });
@@ -439,9 +473,9 @@ function curTheme(){return document.documentElement.getAttribute("data-theme")||
 function themeLabel(){var b=document.getElementById("tema");if(b){var d=curTheme()==="dark";b.textContent=d?"☀️":"🌙";b.setAttribute("aria-label",d?"Ganti ke mode terang":"Ganti ke mode gelap");b.title=d?"Mode terang":"Mode gelap"}}
 document.getElementById("tema").onclick=function(){var n=curTheme()==="dark"?"light":"dark";document.documentElement.setAttribute("data-theme",n);try{localStorage.setItem(THEME_KEY,n)}catch(e){}themeLabel()};
 themeLabel();
-document.querySelector("main").addEventListener("change",function(e){var i=e.target.id;if(i==="pf"){pf=e.target.value;render()}else if(i==="rk"){var rw=document.getElementById("rkw"),ri=document.getElementById("rket"),rr=e.target.value==="rusak";rw.hidden=!rr;ri.required=rr;if(rr)ri.focus()}else if(i==="fp"||i==="fa"){F[i==="fp"?"p":"a"]=e.target.value;render()}});
+document.querySelector("main").addEventListener("change",function(e){var i=e.target.id;if(i==="pf"){pf=e.target.value;pg.pinjam=1;render()}else if(i==="rk"){var rw=document.getElementById("rkw"),ri=document.getElementById("rket"),rr=e.target.value==="rusak";rw.hidden=!rr;ri.required=rr;if(rr)ri.focus()}else if(i==="fp"||i==="fa"){F[i==="fp"?"p":"a"]=e.target.value;pg.rp=pg.rs=1;render()}});
 document.addEventListener("keydown",function(e){if(e.key==="Escape"&&(lendId||svcId||ketId||retId||confirmId)){lendId=null;svcId=null;ketId=null;retId=null;confirmId=null;render()}});
-renderSync();
+renderSync();ntAuto();
 load().then(function(){checkOld();render()},function(e){setSyn("err",e&&e.message||"")});
 </script>
 </body>
