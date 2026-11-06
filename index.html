@@ -38,6 +38,10 @@ button{font:inherit;cursor:pointer}
 .top{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:12px}.top h1{margin:4px 0}
 #tema{flex:none;font-size:1.3rem;line-height:1;padding:8px 10px}
 .btn.wa{background:#25d366;color:#04301a;text-decoration:none;display:inline-block}
+.waic{width:20px;height:20px;fill:currentColor;flex:none}
+#wm{display:inline-flex;align-items:center;gap:7px;background:#1faa59;border-color:#1faa59;color:#fff}
+#wm:hover{background:#198f4a;border-color:#198f4a}
+#wm[aria-pressed="true"]{background:#198f4a;border-color:#198f4a;box-shadow:inset 0 0 0 2px rgba(255,255,255,.55)}
 .wa.off{opacity:.55}
 .wasent{background:var(--info);color:var(--card);border-color:var(--info);font-weight:700}
 .top{flex-wrap:wrap}.tools{display:flex;gap:8px;align-items:center}
@@ -90,7 +94,7 @@ button{font:inherit;cursor:pointer}
 </head>
 <body>
 <main>
-<div class="top"><h1>Pengelola alat kerja</h1><div class="tools"><button class="sm" id="wm" type="button" aria-pressed="false">💬 Pesan WA<span class="wcnt" id="wc" hidden>0</span></button><button class="sm" id="tema" type="button"></button></div></div>
+<div class="top"><h1>Pengelola alat kerja</h1><div class="tools"><button class="sm" id="wm" type="button" aria-pressed="false"><span id="wmi"></span>Pesan WA<span class="wcnt" id="wc" hidden>0</span></button><button class="sm" id="tema" type="button"></button></div></div>
 <div id="sync" class="card" hidden></div>
 <div class="stat" id="stat"></div>
 <nav role="tablist">
@@ -215,6 +219,7 @@ function dls(){return dl("dl-pn",uniqV("nama"))+dl("dl-pm",uniqV("mandor"))+dl("
 var PS=20,pg={alat:1,pinjam:1,servis:1,rp:1,rs:1},fcL=null,fcS=null;
 function paged(a,k){var n=Math.max(1,Math.ceil(a.length/PS));pg[k]=Math.min(Math.max(1,pg[k]),n);return a.slice((pg[k]-1)*PS,pg[k]*PS)}
 function pagerHtml(k,total){if(total<=PS)return"";var n=Math.ceil(total/PS),c=pg[k];return'<div class="pager"><button class="sm" type="button" data-a="pg" data-k="'+k+'" data-d="-1"'+(c<=1?" disabled":"")+'>\u2039 Sebelumnya</button><span class="m">Halaman '+c+' dari '+n+'<br>'+total+' data</span><button class="sm" type="button" data-a="pg" data-k="'+k+'" data-d="1"'+(c>=n?" disabled":"")+'>Berikutnya \u203a</button></div>'}
+var WAIC='<svg class="waic" viewBox="0 0 24 24" aria-hidden="true"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg>';
 function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,6)}
 function esc(s){return String(s==null?"":s).replace(/[&<>"']/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]})}
 function ymd(d){return d.getFullYear()+"-"+("0"+(d.getMonth()+1)).slice(-2)+"-"+("0"+d.getDate()).slice(-2)}
@@ -475,6 +480,7 @@ document.getElementById("tema").onclick=function(){var n=curTheme()==="dark"?"li
 themeLabel();
 document.querySelector("main").addEventListener("change",function(e){var i=e.target.id;if(i==="pf"){pf=e.target.value;pg.pinjam=1;render()}else if(i==="rk"){var rw=document.getElementById("rkw"),ri=document.getElementById("rket"),rr=e.target.value==="rusak";rw.hidden=!rr;ri.required=rr;if(rr)ri.focus()}else if(i==="fp"||i==="fa"){F[i==="fp"?"p":"a"]=e.target.value;pg.rp=pg.rs=1;render()}});
 document.addEventListener("keydown",function(e){if(e.key==="Escape"&&(lendId||svcId||ketId||retId||confirmId)){lendId=null;svcId=null;ketId=null;retId=null;confirmId=null;render()}});
+document.getElementById("wmi").outerHTML=WAIC;
 renderSync();ntAuto();
 load().then(function(){checkOld();render()},function(e){setSyn("err",e&&e.message||"")});
 </script>
