@@ -119,7 +119,7 @@ button{font:inherit;cursor:pointer}
 <div class="stat" id="stat"></div>
 <nav role="tablist">
 <button role="tab" data-t="alat" aria-selected="true">Alat</button>
-<button role="tab" data-t="pinjam" aria-selected="false">Pinjam</button>
+<button role="tab" data-t="pinjam" aria-selected="false">Pinjam<span class="wcnt" id="pjc" hidden></span></button>
 <button role="tab" data-t="servis" aria-selected="false">Servis</button>
 </nav>
 <section id="alat"></section>
@@ -535,8 +535,10 @@ function renderServis(){
   document.getElementById("servis").innerHTML=h+pagerHtml("servis",totS)+'</div>';
 }
 
+function tabBadge(){var n=S.loans.filter(function(l){var d=l.back?null:sisaOf(l);return d!==null&&d<=3}).length,b=document.getElementById("pjc"),t=b.parentNode;
+  b.hidden=!n;b.textContent=n;t.setAttribute("aria-label",n?"Pinjam, "+n+" alat tinggal 3 hari atau kurang":"Pinjam")}
 function render(){
-  renderStat();
+  renderStat();tabBadge();
   ["alat","pinjam","servis"].forEach(function(id){document.getElementById(id).hidden=!!page||id!==tab});
   document.getElementById("page").hidden=!page;document.querySelector("nav").hidden=!!page;document.getElementById("stat").hidden=!!page;
   if(page){renderPage();return}
