@@ -44,11 +44,16 @@ button{font:inherit;cursor:pointer}
 #wm[aria-pressed="true"]{background:#198f4a;border-color:#198f4a;box-shadow:inset 0 0 0 2px rgba(255,255,255,.55)}
 .wa.off{opacity:.55}
 .wasent{background:var(--info);color:var(--card);border-color:var(--info);font-weight:700}
-.top{flex-wrap:wrap}.tools{display:flex;gap:8px;align-items:center}
+.top{flex-wrap:wrap}.tools{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 #wm{position:relative;white-space:nowrap;font-weight:700}
 .wcnt{display:inline-block;min-width:18px;height:18px;line-height:18px;border-radius:99px;background:var(--bad);color:#fff;font-size:.72rem;text-align:center;padding:0 5px;margin-left:4px}
-#wapanel:not([hidden]){position:fixed;inset:0;z-index:60;background:var(--bg);overflow:auto;padding:0 14px calc(14px + env(safe-area-inset-bottom,0px))}
-#wapanel>*{max-width:720px;margin-left:auto;margin-right:auto}
+#rm{display:inline-flex;align-items:center;gap:7px;white-space:nowrap;font-weight:700}
+#logpanel:not([hidden]),#wapanel:not([hidden]){position:fixed;inset:0;z-index:60;background:var(--bg);overflow:auto;padding:0 14px calc(14px + env(safe-area-inset-bottom,0px))}
+#wapanel>*,#logpanel>*{max-width:720px;margin-left:auto;margin-right:auto}
+.lg{border:1px solid var(--line);border-radius:10px;background:var(--card);padding:12px 14px;margin-top:10px}
+.lg .lh{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.lg .lt{margin-left:auto;font-size:.82rem;color:var(--mute)}
+.lg .ln{font-weight:700;margin:6px 0 2px;overflow-wrap:anywhere}
+.lg .ld{font-size:.92rem;color:var(--ink);overflow-wrap:anywhere}.lg .ld s{color:var(--mute)}
 .ph{display:flex;gap:10px;align-items:center;position:sticky;top:0;z-index:2;background:var(--bg);padding:calc(12px + env(safe-area-inset-top,0px)) 0 12px;border-bottom:1px solid var(--line)}
 .grp{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px;margin:12px auto}
 .gh{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;margin-bottom:10px}.gh h3{margin:0;font-size:1.05rem}.gh label{display:flex;gap:6px;align-items:center;margin:0;flex:1 1 220px}.gh input{flex:1}
@@ -94,7 +99,7 @@ button{font:inherit;cursor:pointer}
 </head>
 <body>
 <main>
-<div class="top"><h1>Pengelola alat kerja</h1><div class="tools"><button class="sm" id="wm" type="button" aria-pressed="false"><span id="wmi"></span>Pesan WA<span class="wcnt" id="wc" hidden>0</span></button><button class="sm" id="tema" type="button"></button></div></div>
+<div class="top"><h1>Pengelola alat kerja</h1><div class="tools"><button class="sm" id="wm" type="button" aria-pressed="false"><span id="wmi"></span>Pesan WA<span class="wcnt" id="wc" hidden>0</span></button><button class="sm" id="rm" type="button" aria-pressed="false"><svg class="waic" viewBox="0 0 24 24" aria-hidden="true"><path d="M13 3a9 9 0 0 0-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42A8.954 8.954 0 0 0 13 21a9 9 0 0 0 0-18zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z"/></svg>Riwayat update</button><button class="sm" id="tema" type="button"></button></div></div>
 <div id="sync" class="card" hidden></div>
 <div class="stat" id="stat"></div>
 <nav role="tablist">
@@ -108,6 +113,7 @@ button{font:inherit;cursor:pointer}
 <section id="page" hidden></section>
 </main>
 <div id="wapanel" hidden></div>
+<div id="logpanel" hidden></div>
 <script>
 var KEY="alatkerja.v2",S={units:[],loans:[],services:[],waSel:[],waSent:{},hp:{}},OLD=null,ready=false,UIK="alatkerja.ui",tab="alat",q="",page=null,flt="semua",svcId=null,ketId=null,lendId=null,retId=null,confirmId=null,pf="semua",F={p:"",a:""},msg="";
 try{var raw=localStorage.getItem(KEY);if(raw){var p=JSON.parse(raw);if(p&&p.units&&p.loans)OLD=p}}catch(e){}
@@ -208,7 +214,7 @@ document.getElementById("sync").addEventListener("click",function(e){var b=e.tar
   if(s==="retry"){setSyn("load");load().then(function(){checkOld();render()},function(e){setSyn("err",e&&e.message||"")})}
   else if(s==="imp")doImport();
   else if(s==="skip"){try{localStorage.setItem("alatkerja.imported","1")}catch(x){}setSyn("")}});
-function refresh(){if(!ready||lendId||retId||svcId||confirmId||waOpen||page==="tambah")return;var a=document.activeElement;if(a&&/^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName))return;load().then(function(){render()},function(){})}
+function refresh(){if(!ready||lendId||retId||svcId||confirmId||editId||waOpen||logOpen||page==="tambah")return;var a=document.activeElement;if(a&&/^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName))return;load().then(function(){render()},function(){})}
 document.addEventListener("visibilitychange",function(){if(!document.hidden)refresh()});
 setInterval(refresh,30000);
 function norm(s){return String(s==null?"":s).replace(/\s+/g," ").trim().toUpperCase()}
@@ -260,7 +266,7 @@ function listAlat(){
     var ll=u.rusak?lastLoan(u.id):null;if(ll)rows.push(["Peminjam terakhir",ll.nama]);
     var sv=lastSvc(u.id);if(sv)rows.push(["Biaya servis terakhir",rp(sv.biaya)+" ("+fmt(sv.selesai)+")"]);
     var kv=rows.map(function(r){return'<dt>'+r[0]+'</dt><dd>'+esc(r[1])+'</dd>'}).join("");
-    h+='<div class="unit s-'+s+'"'+(s==="tersedia"?'':' data-go="'+u.id+'" role="link" tabindex="0" aria-label="Buka di tab '+(s==="dipinjam"?"Pinjam":"Servis")+'"')+'><div class="uh"><div><div class="t">'+esc(label(u))+'</div><div class="sn">No. seri: <span class="seri">'+esc(u.seri)+'</span></div></div><span class="badge '+cls+'">'+txt+'</span></div><dl class="kv">'+kv+'</dl><div class="acts">'+(s==="tersedia"?'<button class="btn" data-a="lend" data-id="'+u.id+'">Pinjam</button>':'')+'<button class="sm danger" data-a="ask" data-id="'+u.id+'">Hapus</button>'+'</div></div>'+(lendId===u.id?'<div class="ov"><form class="mdl" data-lend="'+u.id+'"><h2 style="flex:1 1 100%;margin:0">Pinjam '+esc(label(u))+'</h2><div class="sn" style="flex:1 1 100%">No. seri <span class="seri">'+esc(u.seri)+'</span></div><div style="flex:1 1 100%"><label for="pn">Nama peminjam</label><input id="pn" class="uc" list="dl-pn" autocomplete="off" required></div><div style="flex:1 1 140px"><label for="pm">Nama mandor (opsional)</label><input id="pm" class="uc" list="dl-pm" autocomplete="off"></div><div style="flex:1 1 100%"><label for="ps">No. SPK (cari lalu pilih dari daftar)</label><input id="ps" class="uc" autocomplete="off" placeholder="Ketik no. SPK, lokasi, atau pekerjaan" required><div id="psr" class="spkl" hidden></div></div><div style="flex:1 1 100%"><label for="pl">Lokasi pekerjaan</label><input id="pl" class="uc" list="dl-pl" autocomplete="off" required></div><div style="flex:1 1 140px"><label for="pt">Tanggal pinjam</label><input id="pt" type="date" value="'+today()+'" required></div><div style="flex:1 1 140px"><label for="pk">Tanggal kembali</label><input id="pk" type="date" required></div><p id="pe" class="bad" style="flex:1 1 100%;margin:0"></p><div class="acts"><button class="btn" type="submit">Catat pinjam</button><button class="sm" type="button" data-a="cancel">Batal</button></div>'+dls()+'</form></div>':'')+(confirmId===u.id?'<div class="ov"><form class="mdl" data-del="'+u.id+'"><h2 style="flex:1 1 100%;margin:0">Hapus alat</h2><div class="sn" style="flex:1 1 100%">'+esc(label(u))+' · <span class="seri">'+esc(u.seri)+'</span></div><div class="m" style="flex:1 1 100%">Alat beserta riwayat pinjam dan servisnya akan dihapus.</div><div style="flex:1 1 100%"><label for="dp">Password</label><input id="dp" type="password" autocomplete="off" required></div><p id="de" class="bad" style="flex:1 1 100%;margin:0"></p><div class="acts"><button class="btn" type="submit">Hapus alat</button><button class="sm" type="button" data-a="cancel">Batal</button></div></form></div>':'')});
+    h+='<div class="unit s-'+s+'"'+(s==="tersedia"?'':' data-go="'+u.id+'" role="link" tabindex="0" aria-label="Buka di tab '+(s==="dipinjam"?"Pinjam":"Servis")+'"')+'><div class="uh"><div><div class="t">'+esc(label(u))+'</div><div class="sn">No. seri: <span class="seri">'+esc(u.seri)+'</span></div></div><span class="badge '+cls+'">'+txt+'</span></div><dl class="kv">'+kv+'</dl><div class="acts">'+(s==="tersedia"?'<button class="btn" data-a="lend" data-id="'+u.id+'">Pinjam</button>':'')+'<button class="sm" data-a="uedit" data-id="'+u.id+'">Edit</button><button class="sm danger" data-a="ask" data-id="'+u.id+'">Hapus</button>'+'</div></div>'+(lendId===u.id?'<div class="ov"><form class="mdl" data-lend="'+u.id+'"><h2 style="flex:1 1 100%;margin:0">Pinjam '+esc(label(u))+'</h2><div class="sn" style="flex:1 1 100%">No. seri <span class="seri">'+esc(u.seri)+'</span></div><div style="flex:1 1 100%"><label for="pn">Nama peminjam</label><input id="pn" class="uc" list="dl-pn" autocomplete="off" required></div><div style="flex:1 1 140px"><label for="pm">Nama mandor (opsional)</label><input id="pm" class="uc" list="dl-pm" autocomplete="off"></div><div style="flex:1 1 100%"><label for="ps">No. SPK (cari lalu pilih dari daftar)</label><input id="ps" class="uc" autocomplete="off" placeholder="Ketik no. SPK, lokasi, atau pekerjaan" required><div id="psr" class="spkl" hidden></div></div><div style="flex:1 1 100%"><label for="pl">Lokasi pekerjaan</label><input id="pl" class="uc" list="dl-pl" autocomplete="off" required></div><div style="flex:1 1 140px"><label for="pt">Tanggal pinjam</label><input id="pt" type="date" value="'+today()+'" required></div><div style="flex:1 1 140px"><label for="pk">Tanggal kembali</label><input id="pk" type="date" required></div><p id="pe" class="bad" style="flex:1 1 100%;margin:0"></p><div class="acts"><button class="btn" type="submit">Catat pinjam</button><button class="sm" type="button" data-a="cancel">Batal</button></div>'+dls()+'</form></div>':'')+(confirmId===u.id?'<div class="ov"><form class="mdl" data-del="'+u.id+'"><h2 style="flex:1 1 100%;margin:0">Hapus alat</h2><div class="sn" style="flex:1 1 100%">'+esc(label(u))+' · <span class="seri">'+esc(u.seri)+'</span></div><div class="m" style="flex:1 1 100%">Alat beserta riwayat pinjam dan servisnya akan dihapus.</div><div style="flex:1 1 100%"><label for="dp">Password</label><input id="dp" type="password" autocomplete="off" required></div><p id="de" class="bad" style="flex:1 1 100%;margin:0"></p><div class="acts"><button class="btn" type="submit">Hapus alat</button><button class="sm" type="button" data-a="cancel">Batal</button></div></form></div>':'')+(editId===u.id?'<div class="ov"><form class="mdl" data-edit="'+u.id+'"><h2 style="flex:1 1 100%;margin:0">Edit alat</h2><div style="flex:1 1 100%"><label for="eun">Nama alat</label><input id="eun" value="'+esc(u.nama)+'" required></div><div style="flex:1 1 100%"><label for="eum">Merek / tipe</label><input id="eum" value="'+esc(u.merek||"")+'"></div><div style="flex:1 1 100%"><label for="eus">Nomor seri</label><input id="eus" value="'+esc(u.seri)+'" autocapitalize="characters" required></div><p id="eue" class="bad" style="flex:1 1 100%;margin:0"></p><div class="acts"><button class="btn" type="submit">Simpan perubahan</button><button class="sm" type="button" data-a="cancel">Batal</button></div></form></div>':'')});
   document.getElementById("lst").innerHTML=h+pagerHtml("alat",totA);
 }
 
@@ -345,7 +351,7 @@ function renderWa(){
   S.waSel=S.waSel.filter(function(id){if(id.indexOf("s:")===0){var u=unit(id.slice(2));return!!u&&u.rusak}var l=loanById(id);return l&&!l.back});
   var c=document.getElementById("wc");c.textContent=S.waSel.length;c.hidden=!S.waSel.length;
   document.getElementById("wm").setAttribute("aria-pressed",String(waOpen));
-  document.body.style.overflow=waOpen?"hidden":"";
+  document.body.style.overflow=(waOpen||logOpen)?"hidden":"";
   if(!waOpen){p.hidden=true;return}
   p.hidden=false;
   var head='<div class="ph"><b>Pesan WhatsApp</b><span class="m">'+S.waSel.length+' alat</span><button class="sm" id="wcl" type="button" style="margin-left:auto">Tutup</button></div>';
@@ -371,11 +377,37 @@ WP.addEventListener("click",function(e){var t=e.target;
 });
 document.getElementById("wm").onclick=function(){waOpen=!waOpen;renderWa()};
 document.addEventListener("keydown",function(e){if(e.key==="Escape"&&waOpen){waOpen=false;renderWa()}});
-var _render=render;render=function(){_render();renderWa();navSync()};
+var _render=render;render=function(){_render();renderWa();renderLog();navSync()};
 var _rw=renderWa;renderWa=function(){_rw();navSync()};
+/* ===== riwayat update (tambah & edit alat) ===== */
+var editId=null,logOpen=false,LOG=[],logLoad=false,logErr="";pg.log=1;
+function logWaktu(w){var d=new Date(w);if(isNaN(d))return"";var z=function(n){return String(n).padStart(2,"0")};return z(d.getDate())+"/"+z(d.getMonth()+1)+"/"+d.getFullYear()+" "+z(d.getHours())+":"+z(d.getMinutes())}
+function loadLog(){logLoad=true;logErr="";renderLog();
+  return sb("ak_log?select=*&order=waktu.desc,id.desc&limit=500").then(function(r){LOG=r||[]},function(e){logErr=e&&e.message||String(e)}).then(function(){logLoad=false;renderLog()})}
+function logItem(x){var d=x.detail||{},nm=[x.nama,x.merek].filter(Boolean).join(" "),lbl={nama:"Nama",merek:"Merek",seri:"No. seri"},body="";
+  if(x.jenis==="tambah"){body=[["nama","Nama"],["merek","Merek"],["seri","No. seri"]].map(function(k){return d[k[0]]?'<div class="ld">'+k[1]+': <b>'+esc(d[k[0]])+'</b></div>':""}).join("")}
+  else{body=["nama","merek","seri"].filter(function(k){return d[k]}).map(function(k){var a=d[k][0]||"-",b=d[k][1]||"-";return'<div class="ld">'+lbl[k]+': <s>'+esc(a)+'</s> \u2192 <b>'+esc(b)+'</b></div>'}).join("")}
+  return'<div class="lg"><div class="lh"><span class="badge '+(x.jenis==="tambah"?"ok":"warn")+'">'+(x.jenis==="tambah"?"Alat baru":"Diedit")+'</span><span class="lt">'+esc(logWaktu(x.waktu))+'</span></div><div class="ln">'+esc(nm)+' \u00b7 <span class="seri">'+esc(x.seri)+'</span></div>'+body+'</div>'}
+function renderLog(){var p=document.getElementById("logpanel");
+  document.getElementById("rm").setAttribute("aria-pressed",String(logOpen));
+  document.body.style.overflow=(waOpen||logOpen)?"hidden":"";
+  if(!logOpen){p.hidden=true;navSync();return}
+  p.hidden=false;
+  var h='<div class="ph"><b>Riwayat update</b><span class="m">'+(logLoad?"memuat\u2026":LOG.length+" catatan")+'</span><button class="sm" id="lcl" type="button" style="margin-left:auto">Tutup</button></div>';
+  if(logErr)h+='<p class="bad" style="margin-top:14px">Gagal memuat riwayat: '+esc(logErr)+'</p><button class="btn" id="lrt" type="button">Coba lagi</button>';
+  else if(!logLoad&&!LOG.length)h+='<p class="empty" style="margin-top:14px">Belum ada catatan. Alat baru yang ditambahkan dan perubahan data alat (nama, merek, no. seri) akan tercatat di sini.</p>';
+  else h+=paged(LOG,"log").map(logItem).join("")+pagerHtml("log",LOG.length);
+  p.innerHTML=h;navSync()}
+document.getElementById("rm").onclick=function(){logOpen=!logOpen;if(logOpen){pg.log=1;waOpen=false;renderWa();loadLog()}else renderLog()};
+document.getElementById("logpanel").addEventListener("click",function(e){var t=e.target;
+  if(t.id==="lcl"){logOpen=false;renderLog()}
+  else if(t.id==="lrt")loadLog();
+  else{var b=t.closest('[data-a="pg"]');if(b&&b.dataset.k==="log"){pg.log=(pg.log||1)+(+b.dataset.d);renderLog();document.getElementById("logpanel").scrollTop=0}}});
+document.addEventListener("keydown",function(e){if(e.key==="Escape"&&logOpen){logOpen=false;renderLog()}});
+
 /* ===== tombol Back HP: kembali ke tampilan sebelumnya (tab, halaman riwayat/form, jendela popup) ===== */
 var navOK=true,navStack=[],navSkip=0;
-function navCur(){return{t:tab,p:page||null,o:(lendId||retId||svcId||ketId||confirmId||waOpen)?1:0}}
+function navCur(){return{t:tab,p:page||null,o:(lendId||retId||svcId||ketId||confirmId||editId||waOpen||logOpen)?1:0}}
 function navSame(a,b){return !!a&&!!b&&a.t===b.t&&a.p===b.p&&a.o===b.o}
 function navInit(){try{navStack=[navCur()];history.replaceState({n:0,c:navStack[0]},"")}catch(e){navOK=false}}
 function navSync(){if(!navOK)return;
@@ -388,7 +420,7 @@ window.addEventListener("popstate",function(e){
   if(navSkip>0){navSkip--;return}
   var st=e.state;if(!st||st.n==null||!st.c)return;
   navStack=navStack.slice(0,st.n);navStack[st.n]=st.c;
-  tab=st.c.t;page=st.c.p;lendId=retId=svcId=ketId=confirmId=null;waOpen=false;
+  tab=st.c.t;page=st.c.p;lendId=retId=svcId=ketId=confirmId=editId=null;waOpen=false;logOpen=false;
   render();window.scrollTo(0,0)});
 
 renderWa();
@@ -451,11 +483,12 @@ function goUnit(id){var u=unit(id),l=loanOf(id),tid;
   var el=document.getElementById(tid);if(el){el.scrollIntoView({block:"center"});el.classList.remove("hl");void el.offsetWidth;el.classList.add("hl");setTimeout(function(){el.classList.remove("hl")},2700)}else window.scrollTo(0,0)}
 document.addEventListener("keydown",function(e){if(e.key==="Enter"&&e.target.matches&&e.target.matches(".unit[data-go]")){e.preventDefault();goUnit(e.target.dataset.go)}});
 document.querySelector("main").addEventListener("click",function(e){
-  if(e.target.classList.contains("ov")){lendId=null;svcId=null;ketId=null;retId=null;confirmId=null;render();return}
+  if(e.target.classList.contains("ov")){lendId=null;svcId=null;ketId=null;retId=null;confirmId=null;editId=null;render();return}
   var g=e.target.closest(".unit[data-go]");if(g&&!e.target.closest("button,a,input,select,label")){goUnit(g.dataset.go);return}
   var b=e.target.closest("[data-a]");if(!b)return;var id=b.dataset.id,a=b.dataset.a,u=unit(id);
-  if(a==="page"){page=b.dataset.p||null;F.p=F.a="";pg.rp=pg.rs=1;lendId=null;retId=null;confirmId=null}else if(a==="flt"){flt=b.dataset.f;pg.alat=1}else if(a==="pg"){pg[b.dataset.k]=(pg[b.dataset.k]||1)+(+b.dataset.d)}else if(a==="fr"){F.p=F.a="";pg.rp=pg.rs=1}else if(a==="lend"){lendId=id;confirmId=null}else if(a==="cancel"){lendId=null;retId=null;svcId=null;ketId=null;confirmId=null}
+  if(a==="page"){page=b.dataset.p||null;F.p=F.a="";pg.rp=pg.rs=1;lendId=null;retId=null;confirmId=null}else if(a==="flt"){flt=b.dataset.f;pg.alat=1}else if(a==="pg"){pg[b.dataset.k]=(pg[b.dataset.k]||1)+(+b.dataset.d)}else if(a==="fr"){F.p=F.a="";pg.rp=pg.rs=1}else if(a==="lend"){lendId=id;confirmId=null}else if(a==="cancel"){lendId=null;retId=null;svcId=null;ketId=null;confirmId=null;editId=null}
   else if(a==="ask"){confirmId=id}
+  else if(a==="uedit"){editId=id;confirmId=null;lendId=null}
   else if(a==="del"){delUnit(id);confirmId=null;save()}
   else if(a==="wa"){addSel(id)}
   else if(a==="back"){retId=id;lendId=null}
@@ -466,8 +499,15 @@ document.querySelector("main").addEventListener("click",function(e){
   if(confirmId){var di=document.getElementById("dp");if(di)di.focus()}
 });
 document.querySelector("main").addEventListener("submit",function(e){
-  var f=e.target,id=f.dataset.lend,rid=f.dataset.ret,sid=f.dataset.svc,kid=f.dataset.ket,did=f.dataset.del;
-  if(did){e.preventDefault();
+  var f=e.target,id=f.dataset.lend,rid=f.dataset.ret,sid=f.dataset.svc,kid=f.dataset.ket,did=f.dataset.del,eid=f.dataset.edit;
+  if(eid){e.preventDefault();var eu=unit(eid);if(!eu)return;
+    var en=document.getElementById("eun").value.trim(),em=document.getElementById("eum").value.trim(),es=document.getElementById("eus").value.trim(),ee=document.getElementById("eue");
+    if(!en||!es){ee.textContent="Nama alat dan nomor seri wajib diisi.";return}
+    var dp=S.units.filter(function(x){return x.id!==eid&&x.seri.toLowerCase()===es.toLowerCase()})[0];
+    if(dp){ee.textContent="Nomor seri "+es+" sudah dipakai oleh "+label(dp)+".";return}
+    if(en!==eu.nama||em!==(eu.merek||"")||es!==eu.seri){eu.nama=en;eu.merek=em;eu.seri=es;W(up("ak_unit",uRow(eu)))}
+    editId=null;save();render()}
+  else if(did){e.preventDefault();
     if(document.getElementById("dp").value!=="201951220"){document.getElementById("de").textContent="Password salah.";return}
     delUnit(did);
     confirmId=null;save();render()}
@@ -498,7 +538,7 @@ function themeLabel(){var b=document.getElementById("tema");if(b){var d=curTheme
 document.getElementById("tema").onclick=function(){var n=curTheme()==="dark"?"light":"dark";document.documentElement.setAttribute("data-theme",n);try{localStorage.setItem(THEME_KEY,n)}catch(e){}themeLabel()};
 themeLabel();
 document.querySelector("main").addEventListener("change",function(e){var i=e.target.id;if(i==="pf"){pf=e.target.value;pg.pinjam=1;render()}else if(i==="rk"){var rw=document.getElementById("rkw"),ri=document.getElementById("rket"),rr=e.target.value==="rusak";rw.hidden=!rr;ri.required=rr;if(rr)ri.focus()}else if(i==="fp"||i==="fa"){F[i==="fp"?"p":"a"]=e.target.value;pg.rp=pg.rs=1;render()}});
-document.addEventListener("keydown",function(e){if(e.key==="Escape"&&(lendId||svcId||ketId||retId||confirmId)){lendId=null;svcId=null;ketId=null;retId=null;confirmId=null;render()}});
+document.addEventListener("keydown",function(e){if(e.key==="Escape"&&(lendId||svcId||ketId||retId||confirmId||editId)){lendId=null;svcId=null;ketId=null;retId=null;confirmId=null;editId=null;render()}});
 document.getElementById("wmi").outerHTML=WAIC;
 navInit();
 renderSync();ntAuto();
